@@ -1,4 +1,4 @@
-# itunes-backup-renamer-golang
+# itunes-backup-renamer-go
 
 **Currently a work in progress.**
 
@@ -31,7 +31,7 @@ This program uses `Manifest.db` to rename the obfuscated names back to the origi
 
 * This executable.
 * [iTunes](https://www.apple.com/itunes/download/) - to create the iTunes backup
-* An iOS device.  Otherwise, you wouldn't have this problem to begin with, right!?
+* [An](https://www.apple.com/iphone/) [iOS](https://www.apple.com/ipad/) [device](https://www.apple.com/ipod-touch/).  Otherwise, you wouldn't have this problem to begin with, right!?
 
 ## Caveats
 
