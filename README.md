@@ -13,6 +13,7 @@ itunes-backup-renamer is a quick and dirty Go program that renames the human-unf
 1. Your files are now sitting inside the `files` directory.
 
 ## See it in action
+Click the image to see it in action on YouTube.
 [![Screenshot](action.jpg)](https://www.youtube.com/watch?v=FxtO1FseEDU)
 
 ## Motivation
