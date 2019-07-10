@@ -43,7 +43,7 @@ Apple changes how they save files on iOS devices every so often, so this program
 
 As for why you need lots of hard drive space, this program copies rather than renames/moves files.  So if you have a 128 GB iPhone that is nearly full, you may need up to 256 GB of free hard drive space to run this program to completion.  If you're running this on an SSD, prepare to have it slammed with writes, but at least it'll complete quickly!  If you're running this on a hard drive, have fun waiting.  If you're running this on a RAM or 3D XPoint drive, wtf?
 
-Linux and macOS binaries are available, but I don't know if they work at all.
+[Linux](https://github.com/chuynh18/tunes-backup-renamer-go/raw/master/iphone-backup-crawler-linux.gz) and [macOS](https://github.com/chuynh18/tunes-backup-renamer-go/raw/master/iphone-backup-crawler-mac.zip) binaries are available, but I don't know if they work at all.
 
 And now for some fun copypasta, because I guarantee absolutely nothing:
 
