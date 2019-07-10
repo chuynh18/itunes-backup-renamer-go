@@ -41,6 +41,8 @@ Apple changes how they save files on iOS devices every so often, so this program
 
 As for why you need lots of hard drive space, this program copies rather than renames/moves files.  So if you have a 128 GB iPhone that is nearly full, you may need up to 256 GB of free hard drive space to run this program to completion.  If you're running this on an SSD, prepare to have it slammed with writes, but at least it'll complete quickly!  If you're running this on a hard drive, have fun waiting.  If you're running this on a RAM or 3D XPoint drive, wtf?
 
+Linux and macOS binaries are available, but I don't know if they work at all.
+
 And now for some fun copypasta, because I guarantee absolutely nothing:
 
 **THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR ANYONE DISTRIBUTING THE SOFTWARE BE LIABLE FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
