@@ -1,7 +1,5 @@
 # itunes-backup-renamer-go
 
-**Currently a work in progress.**
-
 itunes-backup-renamer is a quick and dirty Go program that renames the human-unfriendly filenames created by iTunes and renames them back into their original filenames.
 
 ## Quick!  How do I use this?!
