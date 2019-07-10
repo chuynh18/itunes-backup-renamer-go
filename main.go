@@ -1,18 +1,20 @@
 package main
 
 import (
-	"os"
 	"database/sql"
 	"fmt"
+	"os"
+	"io"
 	"strings"
+	"strconv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
 
 type processParams struct {
-	domain, condition string
-	formats []string
+	domain, condition, destination string
+	formats           []string
 }
 
 func main() {
@@ -33,27 +35,35 @@ func main() {
 	// open Manifest.db
 	db, _ := sql.Open("sqlite3", "./Manifest.db")
 
-	// create directories if they don't already exist (os.MkdirAll ignores collisions!)
-	dirList := []string{"files/sms", "files/camera"}
-	createDirs(dirList)
-
 	// this stores the domains and relevant info for each type of search/rename we will do
 	processParamsList := []processParams{
-		processParams{"CameraRollDomain", "Media/DCIM%", []string{"jpg", "mov"}},
-		processParams{"MediaDomain", "Library/SMS/Attachments%", []string{"jpg", "jpeg", "gif", "png", "mov", "mp4", "mpg", "mpeg", "ogg", "mp3", "m4v", "webm", "ogv", "avi", "pdf"}},
+		processParams{"CameraRollDomain", "Media/DCIM%", "files/camera", []string{"jpg", "mov"}},
+		processParams{"MediaDomain", "Library/SMS/Attachments%", "files/sms", []string{"jpg", "jpeg", "gif", "png", "mov", "mp4", "mpg", "mpeg", "ogg", "mp3", "m4v", "webm", "ogv", "avi", "pdf"}},
 	}
+
+	// create directories if they don't already exist (os.MkdirAll ignores collisions!)
+	createDirs(processParamsList)
 
 	// append uppercase formats to formats slice in each processParam
 	appendUppercaseFormats(processParamsList)
 
 	// do the work!
-	processDomains(db, processParamsList)
+	err := processDomains(db, processParamsList)
+
+	if (err == nil) {
+		fmt.Println("All operations completed successfully!  Press Enter to quit.")
+	} else {
+		fmt.Println("An error has occurred.  Press Enter to quit.")
+		fmt.Println(err)
+	}
+
+	fmt.Scanln()
 }
 
 // takes in list of paths, creates those directories with 755 permissions
-func createDirs(dirList []string) {
-	for _, str := range dirList {
-		os.MkdirAll(str, 0755)
+func createDirs(processParamsList []processParams) {
+	for _, processParam := range processParamsList {
+		os.MkdirAll(processParam.destination, 0755)
 	}
 }
 
@@ -72,18 +82,21 @@ func appendUppercaseFormats(processParamsList []processParams) {
 }
 
 // kicks off file processing for each separate iOS domain (I organize SQLite queries by domain)
-func processDomains(db *sql.DB, processParamsList []processParams) {
+func processDomains(db *sql.DB, processParamsList []processParams) (err error) {
 	for _, processParam := range processParamsList {
 		rows, err := query(db, processParam.domain, processParam.condition, processParam.formats)
 		if err != nil {
 			fmt.Println("An error occurred while performing SELECT query on domain " + processParam.domain)
-			fmt.Println(err)
-			fmt.Println("Press Enter to quit.")
-			fmt.Scanln()
-			return
+			return err
 		}
-		processFiles(rows, &processParam)
+		err = processFiles(rows, &processParam)
+		if err != nil {
+			fmt.Println("An error occurred while copying files.")
+			return err
+		}
 	}
+
+	return nil
 }
 
 // builds query string then performs the query - leaning on SQLite to do the filtering instead of my own code
@@ -106,12 +119,71 @@ func query(db *sql.DB, domain, condition string, formats []string) (rows *sql.Ro
 }
 
 // iterate over the query results and perform file operations
-func processFiles(rows *sql.Rows, processParams *processParams) {
+func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 	var fileID, domain, relativePath string
+	copyLocation := "./" + processParams.destination
+	
 	for rows.Next() {
 		rows.Scan(&fileID, &domain, &relativePath)
-		fmt.Println("fileID: " + fileID + ", domain: " + domain + ", relativePath: " + relativePath)
+
+		// path to file with obfuscated name
+		backupLocation := "./" + fileID[0:2] + "/" + fileID
+
+		// file's original name
+		relPathSlice := strings.Split(relativePath, "/")
+		originalName := relPathSlice[len(relPathSlice) - 1]
+		copyPath := copyLocation + "/"
+		var rename string
+		copyPathMutate := copyPath + originalName
+		counter := 0
+
+		dupe := true
+		// check for duplicate filename in copy destination
+		for dupe {
+			if _, err := os.Stat(copyPathMutate); err == nil {
+				counter++
+
+				renameSlice := strings.Split(originalName, ".")
+				rename = strings.Join(renameSlice[0:len(renameSlice) - 1], ".") + "-" + strconv.Itoa(counter) + "." + renameSlice[len(renameSlice) - 1]
+				copyPathMutate = copyPath + rename
+				} else {
+				dupe = false
+			}
+		}
+		
+		if counter > 0 {
+			fmt.Println("Duplicate filename encountered.  Renaming file to " + rename + ".")
+		}
+
+		err := copy(backupLocation, copyPathMutate)
+		if err != nil {
+			return err
+		}
 	}
-	
-	fmt.Println(processParams)
+
+	return nil
+}
+
+func copy (src, dest string) (err error) {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+
+	destFile, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(destFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	err = destFile.Sync()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
