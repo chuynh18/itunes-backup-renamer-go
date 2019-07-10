@@ -8,7 +8,7 @@ itunes-backup-renamer is a quick and dirty Go program that renames the human-unf
 
 1. Create an **unencrypted** iTunes backup of your iOS device.
 1. [Locate](https://support.apple.com/en-us/HT204215) the backup that iTunes created.  (The link provided goes to an Apple Support article on how to locate iTunes backups.  If this link is broken, then Apple has updated their support page and this script may no longer work on your iTunes backup.  But you can always consult a search engine for this info if you still want to try!)
-1. Download the iphone-backup-crawler executable and place it inside your iTunes backup folder.
+1. [Download](https://github.com/chuynh18/tunes-backup-renamer-go/raw/master/iphone-backup-crawler-win.7z) the iphone-backup-crawler executable and place it inside your iTunes backup folder.
 1. Run the executable and wait for it to finish.
 1. Your files are now sitting inside the `files` directory.
 
@@ -29,7 +29,7 @@ This program uses `Manifest.db` to rename the obfuscated names back to the origi
 
 ## Requirements
 
-* This executable.
+* [This executable](https://github.com/chuynh18/tunes-backup-renamer-go/raw/master/iphone-backup-crawler-win.7z).
 * [iTunes](https://www.apple.com/itunes/download/) - to create the iTunes backup
 * [An](https://www.apple.com/iphone/) [iOS](https://www.apple.com/ipad/) [device](https://www.apple.com/ipod-touch/).  Otherwise, you wouldn't have this problem to begin with, right!?
 
