@@ -123,6 +123,7 @@ func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 	var fileID, domain, relativePath string
 	counter := 0
 	copyLocation := "./" + processParams.destination
+	dupeMap := make(map[string]int)
 
 	fmt.Println("Beginning copy of " + processParams.domain + " files.")
 	
@@ -135,30 +136,25 @@ func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 		// file's original name
 		relPathSlice := strings.Split(relativePath, "/")
 		originalName := relPathSlice[len(relPathSlice) - 1]
-		copyPath := copyLocation + "/"
-		var rename string
-		copyPathMutate := copyPath + originalName
-		dupeCounter := 0
+		var copyPath, rename string
 
-		dupe := true
-		// check for duplicate filename in copy destination
-		for dupe {
-			if _, err := os.Stat(copyPathMutate); err == nil {
-				dupeCounter++
-
-				renameSlice := strings.Split(originalName, ".")
-				rename = strings.Join(renameSlice[0:len(renameSlice) - 1], ".") + "-" + strconv.Itoa(dupeCounter) + "." + renameSlice[len(renameSlice) - 1]
-				copyPathMutate = copyPath + rename
-				} else {
-				dupe = false
-			}
+		// check for dupes
+		originalNameUpper := strings.ToUpper(originalName)
+		_, ok := dupeMap[originalNameUpper]; if ok {
+			renameSlice := strings.Split(originalName, ".")
+			rename = strings.Join(renameSlice[0:len(renameSlice) - 1], ".") + "-" + strconv.Itoa(dupeMap[originalNameUpper]) + "." + renameSlice[len(renameSlice) - 1]
+			copyPath = copyLocation + "/" + rename
+			dupeMap[originalNameUpper]++
+		} else {
+			dupeMap[originalNameUpper] = 1
+			copyPath = copyLocation + "/" + originalName
 		}
-		
-		if dupeCounter > 0 {
+
+		if dupeMap[originalNameUpper] > 1 {
 			fmt.Println("Duplicate filename encountered.  Renaming file to " + rename + ".")
 		}
 
-		err := copy(backupLocation, copyPathMutate)
+		err := copy(backupLocation, copyPath)
 		if err != nil {
 			return err
 		}
