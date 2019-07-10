@@ -16,12 +16,22 @@ type processParams struct {
 }
 
 func main() {
-	// open Manifest.db
-	db, err := sql.Open("sqlite3", "./Manifest.db")
-	if err != nil {
-		fmt.Println("An error occurred.  Make sure you're running this program from inside the iTunes backup folder.")
+	// check for Manifest.db, because sql.Open doesn't, sadface
+	if _, err := os.Stat("./Manifest.db"); err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("Manifest.db was not found.  Are you running this program from inside the iTunes backup folder?")
+			fmt.Println("Please move the program itself into the iOS device backup folder that iTunes created, then try running the program again.")
+			fmt.Println("Press Enter to quit.")
+		} else {
+			fmt.Println("Sorry, something unexpectedly went wrong.  Press Enter to quit.")
+		}
+
+		fmt.Scanln()
 		return
 	}
+
+	// open Manifest.db
+	db, _ := sql.Open("sqlite3", "./Manifest.db")
 
 	// create directories if they don't already exist (os.MkdirAll ignores collisions!)
 	dirList := []string{"files/sms", "files/camera"}
@@ -68,6 +78,8 @@ func processDomains(db *sql.DB, processParamsList []processParams) {
 		if err != nil {
 			fmt.Println("An error occurred while performing SELECT query on domain " + processParam.domain)
 			fmt.Println(err)
+			fmt.Println("Press Enter to quit.")
+			fmt.Scanln()
 			return
 		}
 		processFiles(rows, &processParam)
