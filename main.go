@@ -40,12 +40,14 @@ func main() {
 	processDomains(db, processParamsList)
 }
 
+// takes in list of paths, creates those directories with 755 permissions
 func createDirs(dirList []string) {
 	for _, str := range dirList {
 		os.MkdirAll(str, 0755)
 	}
 }
 
+// takes in processParamsList, mutates each processParam.formats slice by appending capitalized strings
 func appendUppercaseFormats(processParamsList []processParams) {
 	for i, processParam := range processParamsList {
 		capitalList := []string{}
@@ -59,9 +61,10 @@ func appendUppercaseFormats(processParamsList []processParams) {
 	}
 }
 
+// kicks off file processing for each separate iOS domain (I organize SQLite queries by domain)
 func processDomains(db *sql.DB, processParamsList []processParams) {
 	for _, processParam := range processParamsList {
-		rows, err := query(db, processParam.domain, processParam.condition)
+		rows, err := query(db, processParam.domain, processParam.condition, processParam.formats)
 		if err != nil {
 			fmt.Println("An error occurred while performing SELECT query on domain " + processParam.domain)
 			fmt.Println(err)
@@ -71,11 +74,26 @@ func processDomains(db *sql.DB, processParamsList []processParams) {
 	}
 }
 
-func query(db *sql.DB, domain, condition string) (rows *sql.Rows, err error) {
-	rows, err = db.Query("SELECT fileID, domain, relativePath FROM Files WHERE (domain = ? AND relativePath LIKE ?)", domain, condition)
+// builds query string then performs the query - leaning on SQLite to do the filtering instead of my own code
+func query(db *sql.DB, domain, condition string, formats []string) (rows *sql.Rows, err error) {
+	// start building the query string (because we only care about certain file name extensions)
+	query := "SELECT fileID, domain, relativePath FROM Files WHERE (domain = ? AND relativePath LIKE ? AND ("
+	var queryFormats []string
+
+	for _, format := range formats {
+		queryFormat := "relativePath LIKE '%" + format + "'"
+		queryFormats = append(queryFormats, queryFormat)
+	}
+
+	// query string built
+	query = query + strings.Join(queryFormats, " OR ") + "))"
+
+	// execute SQLite query
+	rows, err = db.Query(query, domain, condition)
 	return
 }
 
+// iterate over the query results and perform file operations
 func processFiles(rows *sql.Rows, processParams *processParams) {
 	var fileID, domain, relativePath string
 	for rows.Next() {
