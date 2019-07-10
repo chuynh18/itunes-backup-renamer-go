@@ -121,7 +121,10 @@ func query(db *sql.DB, domain, condition string, formats []string) (rows *sql.Ro
 // iterate over the query results and perform file operations
 func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 	var fileID, domain, relativePath string
+	counter := 0
 	copyLocation := "./" + processParams.destination
+
+	fmt.Println("Beginning copy of " + processParams.domain + " files.")
 	
 	for rows.Next() {
 		rows.Scan(&fileID, &domain, &relativePath)
@@ -135,23 +138,23 @@ func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 		copyPath := copyLocation + "/"
 		var rename string
 		copyPathMutate := copyPath + originalName
-		counter := 0
+		dupeCounter := 0
 
 		dupe := true
 		// check for duplicate filename in copy destination
 		for dupe {
 			if _, err := os.Stat(copyPathMutate); err == nil {
-				counter++
+				dupeCounter++
 
 				renameSlice := strings.Split(originalName, ".")
-				rename = strings.Join(renameSlice[0:len(renameSlice) - 1], ".") + "-" + strconv.Itoa(counter) + "." + renameSlice[len(renameSlice) - 1]
+				rename = strings.Join(renameSlice[0:len(renameSlice) - 1], ".") + "-" + strconv.Itoa(dupeCounter) + "." + renameSlice[len(renameSlice) - 1]
 				copyPathMutate = copyPath + rename
 				} else {
 				dupe = false
 			}
 		}
 		
-		if counter > 0 {
+		if dupeCounter > 0 {
 			fmt.Println("Duplicate filename encountered.  Renaming file to " + rename + ".")
 		}
 
@@ -159,8 +162,15 @@ func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 		if err != nil {
 			return err
 		}
+
+		counter++
+
+		if counter % 100 == 0 {
+			fmt.Println("Copied " + strconv.Itoa(counter) + " files...")
+		}
 	}
 
+	fmt.Println("Copy of " + processParams.domain + "files finished.  Copied " + strconv.Itoa(counter) + " files.")
 	return nil
 }
 
