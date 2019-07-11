@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"strconv"
+	"encoding/csv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -18,22 +19,16 @@ type processParams struct {
 }
 
 func main() {
-	// check for Manifest.db, because sql.Open doesn't, sadface
-	if _, err := os.Stat("./Manifest.db"); err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("Manifest.db was not found.  Are you running this program from inside the iTunes backup folder?")
-			fmt.Println("Please move the program itself into the iOS device backup folder that iTunes created, then try running the program again.")
-			fmt.Println("Press Enter to quit.")
-		} else {
-			fmt.Println("Sorry, something unexpectedly went wrong.  Press Enter to quit.")
-		}
+	// open Manifest.db
+	db, err := sql.Open("sqlite3", "./Manifest.db")
 
+	if err != nil {
+		handleError("Error opening Manifest.db.  Did you place this program inside the folder that iTunes created when it backed up your iOS device?", err)
+		fmt.Println("Press Enter to quit.")
 		fmt.Scanln()
 		return
 	}
-
-	// open Manifest.db
-	db, _ := sql.Open("sqlite3", "./Manifest.db")
+	defer db.Close()
 
 	// this stores the domains and relevant info for each type of search/rename we will do
 	processParamsList := []processParams{
@@ -48,16 +43,29 @@ func main() {
 	appendUppercaseFormats(processParamsList)
 
 	// do the work!
-	err := processDomains(db, processParamsList)
+	err = processDomains(db, processParamsList)
 
 	if (err == nil) {
-		fmt.Println("All operations completed successfully!  Press Enter to quit.")
+		fmt.Println("Camera images/videos and SMS attachments backed up successfully!\n")
 	} else {
-		fmt.Println("An error has occurred.  Press Enter to quit.")
-		fmt.Println(err)
+		handleError("An error has occurred.  Not all camera images/videos and SMS attachments may have been saved.", err)
 	}
 
+	err = processContacts()
+
+	if (err == nil) {
+		fmt.Println("Contacts saved successfully.\n")
+	}
+
+	fmt.Println("Press Enter to quit.")
 	fmt.Scanln()
+}
+
+func handleError(msg string, err error) {
+	if err != nil {
+		fmt.Println(msg)
+		fmt.Println(err)
+	}
 }
 
 // takes in list of paths, creates those directories with 755 permissions
@@ -86,12 +94,10 @@ func processDomains(db *sql.DB, processParamsList []processParams) (err error) {
 	for _, processParam := range processParamsList {
 		rows, err := query(db, processParam.domain, processParam.condition, processParam.formats)
 		if err != nil {
-			fmt.Println("An error occurred while performing SELECT query on domain " + processParam.domain)
 			return err
 		}
 		err = processFiles(rows, &processParam)
 		if err != nil {
-			fmt.Println("An error occurred while copying files.")
 			return err
 		}
 	}
@@ -166,7 +172,7 @@ func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 		}
 	}
 
-	fmt.Println("Copy of " + processParams.domain + "files finished.  Copied " + strconv.Itoa(counter) + " files.")
+	fmt.Println("Copy of " + processParams.domain + "files finished.  Copied " + strconv.Itoa(counter) + " files.\n")
 	return nil
 }
 
@@ -190,6 +196,52 @@ func copy (src, dest string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func processContacts() (err error) {
+	contacts, err := sql.Open("sqlite3", "./31/31bb7ba8914766d4ba40d6dfb6113c8b614be442")
+
+	if err != nil {
+		handleError("Error opening contacts database.", err)
+		return
+	}
+
+	defer contacts.Close()
+
+	query := "SELECT c0First, c1Last, c6Organization, c16Phone, c17Email FROM 'ABPersonFullTextSearch_content'"
+	var first, last, middle, org, phoneConcat, email, address sql.NullString
+	rows, err := contacts.Query(query)
+	csvString := [][]string{[]string{"First name", "Last name", "Middle", "Organization", "Phone number", "E-mail address", "Address"}}
+
+	if err != nil {
+		handleError("Could not query contacts database.  Skipping saving of contacts.", err)
+		return
+	}
+
+	file, err := os.Create("./files/contacts.csv")
+
+	if err != nil {
+		handleError("Unable to create contacts.csv.", err)
+		return
+	}
+
+	defer file.Close()
+
+	for rows.Next() {
+		rows.Scan(&first, &last, &middle, &org, &phoneConcat, &email, &address)
+
+		phoneList := strings.Split(strings.Split(strings.Split(phoneConcat.String, " +")[0], " *")[0], " #")
+		phone := phoneList[0]
+
+		csvString = append(csvString, []string{first.String, last.String, middle.String, org.String, phone, email.String, address.String})
+	}
+
+	fmt.Println("Saving contacts.")
+	csvWriter := csv.NewWriter(file)
+	csvWriter.WriteAll(csvString)
+	csvWriter.Flush()
 
 	return nil
 }

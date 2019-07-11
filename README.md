@@ -2,6 +2,11 @@
 
 itunes-backup-renamer is a quick and dirty Go program that renames the human-unfriendly filenames created by iTunes and renames them back into their original filenames.
 
+It currently recovers the following from iTunes backups:
+* Photos and videos taken with the device's camera
+* Photos and videos sent/received as SMS attachments (technically MMS but whatever)
+* Contact information (not all fields, just some of the important ones)
+
 ## Quick!  How do I use this?!
 
 1. Create an **unencrypted** iTunes backup of your iOS device.
@@ -23,6 +28,8 @@ I [originally](https://github.com/chuynh18/itunes-backup-renamer/) did this as a
 
 This program crawls the iTunes-created backup for jpg and mov files captured by the device's camera, along with most images and videos sent to or from the device via SMS/MMS.  It then copies them to the `files` directory under a more human-friendly name.
 
+It also saves contact information stored on the device as a CSV.  You likely already have this backed up to your iCloud account.
+
 ## How does it work?
 
 Apple obfuscates files saved from iOS devices via the iTunes backup function.  The filenames on your local machine are SHA-1 hashes of the concatenation of the iOS domain, the dash character `-`, and the path to the file on the iOS device.  A SQLite database is also saved under the name `Manifest.db` in the backup folder.  This database stores both the obfuscated name and the original filename.
@@ -39,7 +46,7 @@ This program uses `Manifest.db` to rename the obfuscated names back to the origi
 
 tl;dr:  Does not work on older versions of iOS.  Does not target audio files at all.  I haven't tested this program on anything other than Windows, but hope it will just work on other platforms.  You may need a LOT of hard drive space to run this to completion!
 
-Apple changes how they save files on iOS devices every so often, so this program probably only works on recent versions of iOS.  I am not totally sure which versions, as I only wrote this to save files off a relative's iPhone and am not an iOS user myself!  He also didn't store any music on his iPhone, which is why this program doesn't currently target audio files.
+Apple changes how they save files on iOS devices every so often, so this program probably only works on recent versions of iOS.  I am not totally sure which versions, as I only wrote this to save files off a relative's iPhone and am not an iOS user myself!  iTunes backups do not include music, as that's in theory already in your iTunes library, so this tool will not be able to recover your music.
 
 As for why you need lots of hard drive space, this program copies rather than renames/moves files.  So if you have a 128 GB iPhone that is nearly full, you may need up to 256 GB of free hard drive space to run this program to completion.  If you're running this on an SSD, prepare to have it slammed with writes, but at least it'll complete quickly!  If you're running this on a hard drive, have fun waiting.  If you're running this on a RAM or 3D XPoint drive, wtf?
 
