@@ -13,9 +13,14 @@ import (
 
 var db *sql.DB
 
-type processParams struct {
+type domainParams struct {
 	domain, condition, destination string
 	formats           []string
+}
+
+type dbParams struct {
+	friendlyName, dbPath, query string
+	csvHeadings []string
 }
 
 func main() {
@@ -31,30 +36,40 @@ func main() {
 	defer db.Close()
 
 	// this stores the domains and relevant info for each type of search/rename we will do
-	processParamsList := []processParams{
-		processParams{"CameraRollDomain", "Media/DCIM%", "files/camera", []string{"jpg", "mov"}},
-		processParams{"MediaDomain", "Library/SMS/Attachments%", "files/sms", []string{"jpg", "jpeg", "gif", "png", "mov", "mp4", "mpg", "mpeg", "ogg", "mp3", "m4v", "webm", "ogv", "avi", "pdf"}},
+	domainParamsList := []domainParams{
+		domainParams{"CameraRollDomain", "Media/DCIM%", "files/camera", []string{"jpg", "mov"}},
+		domainParams{"MediaDomain", "Library/SMS/Attachments%", "files/sms", []string{"jpg", "jpeg", "gif", "png", "mov", "mp4", "mpg", "mpeg", "ogg", "mp3", "m4v", "webm", "ogv", "avi", "pdf"}},
 	}
 
-	// create directories if they don't already exist (os.MkdirAll ignores collisions!)
-	createDirs(processParamsList)
+	dbParamsList := []dbParams{
+		dbParams{"Contacts", "./31/31bb7ba8914766d4ba40d6dfb6113c8b614be442", "SELECT c0First, c1Last, c2Middle, c6Organization, c16Phone, c17Email, c18Address FROM 'ABPersonFullTextSearch_content'", []string{"First name", "Last name", "Middle", "Organization", "Phone number", "E-mail address", "Address"}},
+	}
+
+	// create directories if they don't already exist (os.MkdirAll does not recreate extant directories, how convenient)
+	createDirs(domainParamsList)
 
 	// append uppercase formats to formats slice in each processParam
-	appendUppercaseFormats(processParamsList)
+	appendUppercaseFormats(domainParamsList)
 
 	// do the work!
-	err = processDomains(db, processParamsList)
+	err = processDomains(db, domainParamsList)
 
 	if (err == nil) {
-		fmt.Println("Camera images/videos and SMS attachments backed up successfully!\n")
+		fmt.Println("Camera images/videos and SMS attachments backed up successfully!")
+		fmt.Println() // fine, have it your way, go-vet
 	} else {
 		handleError("An error has occurred.  Not all camera images/videos and SMS attachments may have been saved.", err)
 	}
 
-	err = processContacts()
-
-	if (err == nil) {
-		fmt.Println("Contacts saved successfully.\n")
+	// Process information held in databases such as contacts, perhaps text messages someday
+	for _, dbParam := range dbParamsList {
+		err = processDb(dbParam)
+		
+		if err == nil {
+			fmt.Println("Processed " + dbParam.friendlyName + " successfully.")
+		} else {
+			handleError("Error while processing " + dbParam.friendlyName + ".", err)
+		}
 	}
 
 	fmt.Println("Press Enter to quit.")
@@ -69,15 +84,15 @@ func handleError(msg string, err error) {
 }
 
 // takes in list of paths, creates those directories with 755 permissions
-func createDirs(processParamsList []processParams) {
-	for _, processParam := range processParamsList {
+func createDirs(domainParamsList []domainParams) {
+	for _, processParam := range domainParamsList {
 		os.MkdirAll(processParam.destination, 0755)
 	}
 }
 
-// takes in processParamsList, mutates each processParam.formats slice by appending capitalized strings
-func appendUppercaseFormats(processParamsList []processParams) {
-	for i, processParam := range processParamsList {
+// takes in domainParamsList, mutates each processParam.formats slice by appending capitalized strings
+func appendUppercaseFormats(domainParamsList []domainParams) {
+	for i, processParam := range domainParamsList {
 		capitalList := []string{}
 
 		for _, ext := range processParam.formats {
@@ -85,13 +100,13 @@ func appendUppercaseFormats(processParamsList []processParams) {
 		}
 
 		// actually mutate the formats key in each processParam struct
-		processParamsList[i].formats = append(processParam.formats, capitalList...)
+		domainParamsList[i].formats = append(processParam.formats, capitalList...)
 	}
 }
 
 // kicks off file processing for each separate iOS domain (I organize SQLite queries by domain)
-func processDomains(db *sql.DB, processParamsList []processParams) (err error) {
-	for _, processParam := range processParamsList {
+func processDomains(db *sql.DB, domainParamsList []domainParams) (err error) {
+	for _, processParam := range domainParamsList {
 		rows, err := query(db, processParam.domain, processParam.condition, processParam.formats)
 		if err != nil {
 			return err
@@ -125,13 +140,13 @@ func query(db *sql.DB, domain, condition string, formats []string) (rows *sql.Ro
 }
 
 // iterate over the query results and perform file operations
-func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
+func processFiles(rows *sql.Rows, domainParams *domainParams) (err error) {
 	var fileID, domain, relativePath string
 	counter := 0
-	copyLocation := "./" + processParams.destination
+	copyLocation := "./" + domainParams.destination
 	dupeMap := make(map[string]int)
 
-	fmt.Println("Beginning copy of " + processParams.domain + " files.")
+	fmt.Println("Beginning copy of " + domainParams.domain + " files.")
 	
 	for rows.Next() {
 		rows.Scan(&fileID, &domain, &relativePath)
@@ -172,7 +187,7 @@ func processFiles(rows *sql.Rows, processParams *processParams) (err error) {
 		}
 	}
 
-	fmt.Println("Copy of " + processParams.domain + "files finished.  Copied " + strconv.Itoa(counter) + " files.\n")
+	fmt.Println("Copy of " + domainParams.domain + "files finished.  Copied " + strconv.Itoa(counter) + " files.\n")
 	return nil
 }
 
@@ -200,42 +215,51 @@ func copy (src, dest string) (err error) {
 	return nil
 }
 
-func processContacts() (err error) {
-	contacts, err := sql.Open("sqlite3", "./31/31bb7ba8914766d4ba40d6dfb6113c8b614be442")
+func processDb(params dbParams) (err error) {
+	db, err := sql.Open("sqlite3", params.dbPath)
 
 	if err != nil {
-		handleError("Error opening contacts database.", err)
+		handleError("Error opening " + params.friendlyName + " database.", err)
 		return
 	}
 
-	defer contacts.Close()
+	defer db.Close()
 
-	query := "SELECT c0First, c1Last, c6Organization, c16Phone, c17Email FROM 'ABPersonFullTextSearch_content'"
-	var first, last, middle, org, phoneConcat, email, address sql.NullString
-	rows, err := contacts.Query(query)
-	csvString := [][]string{[]string{"First name", "Last name", "Middle", "Organization", "Phone number", "E-mail address", "Address"}}
+	rows, err := db.Query(params.query)
+	cols, err := rows.Columns()
+	numCols := len(cols)
+	csvString := [][]string{params.csvHeadings}
+	fileName := params.friendlyName + ".csv"
+
+	file, err := os.Create("files/" + fileName)
 
 	if err != nil {
-		handleError("Could not query contacts database.  Skipping saving of contacts.", err)
+		handleError("Unable to create " + fileName, err)
 		return
 	}
 
-	file, err := os.Create("./files/contacts.csv")
+	valuesList := make([]interface{}, numCols)
 
-	if err != nil {
-		handleError("Unable to create contacts.csv.", err)
-		return
+	for i := range valuesList {
+		var iface interface{}
+		valuesList[i] = &iface
 	}
-
-	defer file.Close()
 
 	for rows.Next() {
-		rows.Scan(&first, &last, &middle, &org, &phoneConcat, &email, &address)
+		prettyLine := []string{}
 
-		phoneList := strings.Split(strings.Split(strings.Split(phoneConcat.String, " +")[0], " *")[0], " #")
-		phone := phoneList[0]
+		rows.Scan(valuesList...)
+		for i := range cols {
+			value := *(valuesList[i].(*interface{})) // but it's actually a string
 
-		csvString = append(csvString, []string{first.String, last.String, middle.String, org.String, phone, email.String, address.String})
+			if value == nil {
+				prettyLine = append(prettyLine, "")
+			} else {
+				prettyLine = append(prettyLine, value.(string))
+			}
+		}
+
+		csvString = append(csvString, prettyLine)
 	}
 
 	fmt.Println("Saving contacts.")
