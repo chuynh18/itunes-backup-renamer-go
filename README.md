@@ -42,6 +42,17 @@ This program uses `Manifest.db` to rename the obfuscated names back to the origi
 * [iTunes](https://www.apple.com/itunes/download/) - to create the iTunes backup
 * [An](https://www.apple.com/iphone/) [iOS](https://www.apple.com/ipad/) [device](https://www.apple.com/ipod-touch/).  Otherwise, you wouldn't have this problem to begin with, right!?
 
+## Compilation
+
+Unfortunately, I can only provide Windows-specific instructions.  That being said, Linux and macOS users should have an easier time.
+
+1. Run `go get github.com/mattn/go-sqlite3`
+1. A C compiler is required to build the `go-sqlite3` database driver.  Ensure `gcc` is installed and in your system PATH.  `gcc` for Windows can be obtained via [mingw-w64](https://mingw-w64.org/doku.php/download).  I've had good experience with both [MingW-W64-builds](https://mingw-w64.org/doku.php/download/mingw-builds) and [Msys2](https://www.msys2.org/).  Note that with MingW-W64-builds, you may have to manually add the `bin` directory to your system PATH.
+1. `cd` into this (itunes-backup-renamer-go) repository.
+1. Run `go build main.go`
+
+To cross compile, set the appropriate `GOOS` and `GOARCH` e.g. `GOOS=linux GOARCH=386 go build main.go` to build an Intel x86 32-bit Linux executable.  [Here is a convenient reference](https://gist.github.com/asukakenji/f15ba7e588ac42795f421b48b8aede63) of valid GOOS and GOARCH values.
+
 ## Caveats
 
 tl;dr:  Does not work on older versions of iOS (potentially not on versions of iOS older than 9.3.5, but I do not have access to devices to test this!)  Does not target audio files at all.  I haven't tested this program on anything other than Windows, but hope it will just work on other platforms.  You may need a LOT of hard drive space to run this to completion!

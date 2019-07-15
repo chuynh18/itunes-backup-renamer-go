@@ -13,11 +13,19 @@ import (
 
 var db *sql.DB
 
+// domain:  iOS domain to query against.  These are defined by Apple (e.g. CameraRollDomain)
+// condition:  the iOS filesystem path that we're interested in.  Will be used in SQL query as part of a LIKE condition.
+// destination:  the relative path where the files will be copied to
+// formats:  LOWERCASE ONLY []string of file extensions to search for (see appendUppercaseFormats())
 type domainParams struct {
 	domain, condition, destination string
 	formats           []string
 }
 
+// friendlyName:  user-facing name of db (used for fmt.Println and naming of csv file)
+// dbPath:  relative path to SQLite db as a string
+// query:  SQL query to run
+// csvHeadings:  []string of headings to use for the CSV file
 type dbParams struct {
 	friendlyName, dbPath, query string
 	csvHeadings []string
@@ -67,8 +75,6 @@ func main() {
 		
 		if err == nil {
 			fmt.Println("Processed " + dbParam.friendlyName + " successfully.")
-		} else {
-			handleError("Error while processing " + dbParam.friendlyName + ".", err)
 		}
 	}
 
@@ -191,6 +197,7 @@ func processFiles(rows *sql.Rows, domainParams *domainParams) (err error) {
 	return nil
 }
 
+// copies files
 func copy (src, dest string) (err error) {
 	srcFile, err := os.Open(src)
 	if err != nil {
@@ -215,6 +222,7 @@ func copy (src, dest string) (err error) {
 	return nil
 }
 
+// execute query against SQLite db and save results to csv
 func processDb(params dbParams) (err error) {
 	db, err := sql.Open("sqlite3", params.dbPath)
 
@@ -226,6 +234,12 @@ func processDb(params dbParams) (err error) {
 	defer db.Close()
 
 	rows, err := db.Query(params.query)
+
+	if err != nil {
+		handleError("Unable to query " + params.friendlyName + " database.", err)
+		return
+	}
+
 	cols, err := rows.Columns()
 	numCols := len(cols)
 	csvString := [][]string{params.csvHeadings}
