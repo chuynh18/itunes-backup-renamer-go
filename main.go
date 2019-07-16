@@ -43,12 +43,14 @@ func main() {
 	}
 	defer db.Close()
 
-	// this stores the domains and relevant info for each type of search/rename we will do
+	// only place that needs to be edited for retrieving additional files
+	// list of domains and relevant info for each type of search/rename we will do
 	domainParamsList := []domainParams{
 		domainParams{"CameraRollDomain", "Media/DCIM%", "files/camera", []string{"jpg", "mov"}},
 		domainParams{"MediaDomain", "Library/SMS/Attachments%", "files/sms", []string{"jpg", "jpeg", "gif", "png", "mov", "mp4", "mpg", "mpeg", "ogg", "mp3", "m4v", "webm", "ogv", "avi", "pdf"}},
 	}
 
+	// list of databases to query and create CSVs for
 	dbParamsList := []dbParams{
 		dbParams{"Contacts", "./31/31bb7ba8914766d4ba40d6dfb6113c8b614be442", "SELECT c0First, c1Last, c2Middle, c6Organization, c16Phone, c17Email, c18Address FROM 'ABPersonFullTextSearch_content'", []string{"First name", "Last name", "Middle", "Organization", "Phone number", "E-mail address", "Address"}},
 	}
@@ -59,7 +61,22 @@ func main() {
 	// append uppercase formats to formats slice in each processParam
 	appendUppercaseFormats(domainParamsList)
 
-	// do the work!
+	// Process contacts
+	for _, dbParam := range dbParamsList {
+		err = processDb(dbParam)
+		
+		if err == nil {
+			fmt.Println("Processed " + dbParam.friendlyName + " successfully.")
+		}
+	}
+
+	// process SMS/iMessage conversations
+	err = processSMS()
+	if err == nil {
+		fmt.Println("SMS messages saved.")
+	}
+
+	// copy camera media and SMS/iMessage attachments
 	err = processDomains(db, domainParamsList)
 
 	if (err == nil) {
@@ -67,15 +84,6 @@ func main() {
 		fmt.Println() // fine, have it your way, go-vet
 	} else {
 		handleError("An error has occurred.  Not all camera images/videos and SMS attachments may have been saved.", err)
-	}
-
-	// Process information held in databases such as contacts, perhaps text messages someday
-	for _, dbParam := range dbParamsList {
-		err = processDb(dbParam)
-		
-		if err == nil {
-			fmt.Println("Processed " + dbParam.friendlyName + " successfully.")
-		}
 	}
 
 	fmt.Println("Press Enter to quit.")
@@ -264,22 +272,89 @@ func processDb(params dbParams) (err error) {
 
 		rows.Scan(valuesList...)
 		for i := range cols {
-			value := *(valuesList[i].(*interface{})) // but it's actually a string
-
-			if value == nil {
-				prettyLine = append(prettyLine, "")
-			} else {
-				prettyLine = append(prettyLine, value.(string))
+			value := *(valuesList[i].(*interface{}))
+			switch value.(type) {
+			// type introspection
+			case string:
+				if value == nil {
+					prettyLine = append(prettyLine, "")
+				} else {
+					prettyLine = append(prettyLine, value.(string))
+				}
+			case int: // not sure if necessary - I think everything's int64
+				if value == nil {
+					prettyLine = append(prettyLine, "")
+				} else {
+					prettyLine = append(prettyLine, strconv.Itoa(value.(int)))
+				}
+			case int64:
+				if value == nil {
+					prettyLine = append(prettyLine, "")
+				} else {
+					prettyLine = append(prettyLine, strconv.Itoa(int(value.(int64))))
+				}
 			}
 		}
 
 		csvString = append(csvString, prettyLine)
 	}
 
-	fmt.Println("Saving contacts.")
 	csvWriter := csv.NewWriter(file)
 	csvWriter.WriteAll(csvString)
 	csvWriter.Flush()
+
+	return nil
+}
+
+// save SMS and iMessage conversations - not the most user friendly, but it works
+func processSMS() (err error) {
+	db, err := sql.Open("sqlite3", "./3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28")
+
+	if err != nil {
+		return err
+	}
+
+	chatQuery := "SELECT ROWID FROM 'chat'"
+	var chatID int
+	var chatIDList []int
+
+	rows, err := db.Query(chatQuery)
+
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		rows.Scan(&chatID)
+		chatIDList = append(chatIDList, chatID)
+	}
+
+	var chatDbParamsList []dbParams
+
+	for _, val := range chatIDList {
+		msgJoinQuery := "SELECT message_id FROM 'chat_message_join' WHERE chat_id = " + strconv.Itoa(val)
+		var chatID int
+		var chatIDList []string
+
+		msgJoinRows, err := db.Query(msgJoinQuery)
+
+		if err != nil {
+			return err
+		}
+
+		for msgJoinRows.Next() {
+			msgJoinRows.Scan(&chatID)
+			chatIDList = append(chatIDList, strconv.Itoa(chatID))
+		}
+
+		msgQuery := "SELECT message.date, message.is_from_me, message.text, handle.id FROM message LEFT JOIN handle ON message.handle_id = handle.ROWID WHERE message.ROWID in (" + strings.Join(chatIDList, ",") + ")"
+
+		chatDbParamsList = append(chatDbParamsList, dbParams{"message_id_" + strconv.Itoa(val), "./3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28", msgQuery, []string{"Date", "From me", "Message text", "ID"}})
+	}
+
+	for _, chatDbParam := range chatDbParamsList {
+		processDb(chatDbParam)
+	}
 
 	return nil
 }
