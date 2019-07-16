@@ -47,7 +47,7 @@ This program uses `Manifest.db` to rename the obfuscated names back to the origi
 Unfortunately, I can only provide Windows-specific instructions.  That being said, Linux and macOS users should have an easier time.
 
 1. Run `go get github.com/mattn/go-sqlite3`
-1. A C compiler is required to build the `go-sqlite3` database driver.  Ensure `gcc` is installed and in your system PATH.  `gcc` for Windows can be obtained via [mingw-w64](https://mingw-w64.org/doku.php/download).  I've had good experience with both [MingW-W64-builds](https://mingw-w64.org/doku.php/download/mingw-builds) and [Msys2](https://www.msys2.org/).  Note that with MingW-W64-builds, you may have to manually add the `bin` directory to your system PATH.
+1. A C compiler is required to build the `go-sqlite3` database driver.  Ensure `gcc` is installed and in your system PATH.  `gcc` for Windows can be obtained via [mingw-w64](https://mingw-w64.org/doku.php/download).  I've had good experience with both [MingW-W64-builds](https://mingw-w64.org/doku.php/download/mingw-builds) or [Msys2](https://www.msys2.org/).  Note that with MingW-W64-builds, you may have to manually add the `bin` directory to your system PATH.
 1. `cd` into this (itunes-backup-renamer-go) repository.
 1. Run `go build main.go`
 
