@@ -56,7 +56,7 @@ To cross compile, set the appropriate `GOOS` and `GOARCH` e.g. `GOOS=linux GOARC
 
 ## Caveats
 
-tl;dr:  Does not work on older versions of iOS (potentially not on versions of iOS older than 9.3.5, but I do not have access to devices to test this!)  Does not target audio files at all.  I haven't tested this program on anything other than Windows, but hope it will just work on other platforms.  You may need a LOT of hard drive space to run this to completion!
+tl;dr:  Does not work on older versions of iOS (potentially not on versions of iOS older than 9.3.5, but I do not have access to devices to test this!)  I haven't tested this program on anything other than Windows, but hope it will just work on other platforms.  You may need a LOT of hard drive space to run this tool to completion!
 
 Apple changes how they save files on iOS devices every so often, so this program probably only works on recent versions of iOS.  I am not totally sure which versions, as I only wrote this to save files off a relative's iPhone and am not an iOS user myself!  iTunes backups do not include music, as that's in theory already in your iTunes library, so this tool will not be able to recover your music.
 
