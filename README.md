@@ -18,7 +18,7 @@ It currently recovers the following from iTunes backups:
 
 ## See it in action
 Click the image to see it in action on YouTube.
-[![Screenshot](action.jpg)](https://www.youtube.com/watch?v=FxtO1FseEDU)
+[![Screenshot](action.jpg)](https://www.youtube.com/watch?v=KZil7RGOcp0)
 
 ## Motivation
 There are a ton of trialware and shareware apps (that look a whole lot friendlier and more polished, to be fair!) that will help you recover files from your iOS device.  However, they are often limited in their capabilities until you pony up the $20 or $30 to fully unlock all their features.  I did not want to pay $20 or $30.
