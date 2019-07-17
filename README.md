@@ -3,9 +3,10 @@
 itunes-backup-renamer is a quick and dirty Go program that renames the human-unfriendly filenames created by iTunes and renames them back into their original filenames.
 
 It currently recovers the following from iTunes backups:
+* Contact information (not all fields, just some of the important ones)
+* SMS/iMessage conversations are saved as CSVs.
 * Photos and videos taken with the device's camera
 * Photos and videos sent/received as SMS attachments (technically MMS but whatever)
-* Contact information (not all fields, just some of the important ones)
 
 ## Quick!  How do I use this?!
 
