@@ -31,6 +31,13 @@ type dbParams struct {
 	csvHeadings []string
 }
 
+// used for building map of SMS/iMessage IDs to contact first name and last name
+// first:  First name
+// last:  Last name
+type firstLast struct {
+	first, last string
+}
+
 func main() {
 	// open Manifest.db
 	db, err := sql.Open("sqlite3", "./Manifest.db")
@@ -70,8 +77,14 @@ func main() {
 		}
 	}
 
+	contactsMap, err := mapNumberToName()
+
+	if err != nil {
+		handleError("Error mapping contacts.", err)
+	}
+
 	// process SMS/iMessage conversations
-	err = processSMS()
+	err = processSMS(contactsMap)
 	if err == nil {
 		fmt.Println("SMS messages saved.")
 	}
@@ -252,13 +265,7 @@ func processDb(params dbParams) (err error) {
 	numCols := len(cols)
 	csvString := [][]string{params.csvHeadings}
 	fileName := params.friendlyName + ".csv"
-
-	file, err := os.Create("files/" + fileName)
-
-	if err != nil {
-		handleError("Unable to create " + fileName, err)
-		return
-	}
+	pathToFile := "files/" + fileName
 
 	valuesList := make([]interface{}, numCols)
 
@@ -273,19 +280,14 @@ func processDb(params dbParams) (err error) {
 		rows.Scan(valuesList...)
 		for i := range cols {
 			value := *(valuesList[i].(*interface{}))
-			switch value.(type) {
+			
 			// type introspection
+			switch value.(type) {
 			case string:
 				if value == nil {
 					prettyLine = append(prettyLine, "")
 				} else {
 					prettyLine = append(prettyLine, value.(string))
-				}
-			case int: // not sure if necessary - I think everything's int64
-				if value == nil {
-					prettyLine = append(prettyLine, "")
-				} else {
-					prettyLine = append(prettyLine, strconv.Itoa(value.(int)))
 				}
 			case int64:
 				if value == nil {
@@ -293,10 +295,28 @@ func processDb(params dbParams) (err error) {
 				} else {
 					prettyLine = append(prettyLine, strconv.Itoa(int(value.(int64))))
 				}
+			case int: // not sure if necessary - I think everything's int64
+				if value == nil {
+					prettyLine = append(prettyLine, "")
+				} else {
+					prettyLine = append(prettyLine, strconv.Itoa(value.(int)))
+				}
 			}
 		}
 
 		csvString = append(csvString, prettyLine)
+	}
+
+	saveToCSV(csvString, pathToFile)
+
+	return nil
+}
+
+func saveToCSV(csvString [][]string, pathToFile string) (err error) {
+	file, err := os.Create(pathToFile)
+
+	if err != nil {
+		return
 	}
 
 	csvWriter := csv.NewWriter(file)
@@ -307,11 +327,11 @@ func processDb(params dbParams) (err error) {
 }
 
 // save SMS and iMessage conversations - not the most user friendly, but it works
-func processSMS() (err error) {
+func processSMS(contactsMap map[string]firstLast) (err error) {
 	db, err := sql.Open("sqlite3", "./3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28")
 
 	if err != nil {
-		return err
+		return
 	}
 
 	chatQuery := "SELECT ROWID FROM 'chat'"
@@ -321,15 +341,13 @@ func processSMS() (err error) {
 	rows, err := db.Query(chatQuery)
 
 	if err != nil {
-		return err
+		return
 	}
 
 	for rows.Next() {
 		rows.Scan(&chatID)
 		chatIDList = append(chatIDList, chatID)
 	}
-
-	var chatDbParamsList []dbParams
 
 	for _, val := range chatIDList {
 		msgJoinQuery := "SELECT message_id FROM 'chat_message_join' WHERE chat_id = " + strconv.Itoa(val)
@@ -347,14 +365,81 @@ func processSMS() (err error) {
 			chatIDList = append(chatIDList, strconv.Itoa(chatID))
 		}
 
-		msgQuery := "SELECT message.date, message.is_from_me, message.text, handle.id FROM message LEFT JOIN handle ON message.handle_id = handle.ROWID WHERE message.ROWID in (" + strings.Join(chatIDList, ",") + ")"
+		msgQuery := "SELECT datetime(SUBSTR(message.date,1,9) + strftime('%s', '2001-01-01 00:00:00'), 'unixepoch', 'localtime'), message.is_from_me, message.text, handle.id, message.ROWID, message.cache_has_attachments FROM message LEFT JOIN handle ON message.handle_id = handle.ROWID WHERE message.ROWID in (" + strings.Join(chatIDList, ",") + ")"
 
-		chatDbParamsList = append(chatDbParamsList, dbParams{"message_id_" + strconv.Itoa(val), "./3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28", msgQuery, []string{"Date", "From me", "Message text", "ID"}})
-	}
+		var fromMe, rowID, attachment sql.NullInt64
+		var date, msg, handleID, attachmentPath sql.NullString
+		csvString := [][]string{{"Date", "Handle ID", "First", "Last", "Message", "Attachment file path"}}
 
-	for _, chatDbParam := range chatDbParamsList {
-		processDb(chatDbParam)
+		messages, err := db.Query(msgQuery)
+
+		if err != nil {
+			return err
+		}
+
+		for messages.Next() {
+			messages.Scan(&date, &fromMe, &msg, &handleID, &rowID, &attachment)
+
+			if attachment.Int64 == 1 {
+				var aID sql.NullInt64
+				msgAttachmentQuery := "SELECT attachment_id FROM 'message_attachment_join' WHERE message_id = " + strconv.Itoa(int(rowID.Int64))
+				attachmentID := db.QueryRow(msgAttachmentQuery)
+				
+				attachmentID.Scan(&aID)
+
+				attachmentQuery := "SELECT filename FROM 'attachment' WHERE ROWID = " + strconv.Itoa(int(aID.Int64))
+				attachmentFileName := db.QueryRow(attachmentQuery)
+
+				attachmentFileName.Scan(&attachmentPath)
+			} else {
+				attachmentPath.String = ""
+				attachmentPath.Valid = false
+			}
+
+			if fromMe.Int64 == 1 {
+				csvString = append(csvString, []string{date.String, handleID.String, "Me", "", msg.String, attachmentPath.String})
+			} else {
+				names, ok := contactsMap[handleID.String]; if ok {
+					csvString = append(csvString, []string{date.String, handleID.String, names.first, names.last, msg.String, attachmentPath.String})
+				} else {
+					csvString = append(csvString, []string{date.String, handleID.String, "", "", msg.String, attachmentPath.String})
+				}
+			}
+		}
+
+		saveToCSV(csvString, "./files/message_id_" + strconv.Itoa(val) + ".csv")
 	}
 
 	return nil
+}
+
+func mapNumberToName() (m map[string]firstLast, err error) {
+	db, err := sql.Open("sqlite3", "./31/31bb7ba8914766d4ba40d6dfb6113c8b614be442")
+	m = make(map[string]firstLast)
+
+	if err != nil {
+		return
+	}
+	
+	query := "SELECT c0First, c1Last, c16Phone FROM 'ABPersonFullTextSearch_content'"
+	var first, last, phone sql.NullString
+
+	row, err := db.Query(query)
+
+	if err != nil {
+		return
+	}
+
+	for row.Next() {
+		row.Scan(&first, &last, &phone)
+		phoneSlice := strings.Split(phone.String, " ")
+		if len(phoneSlice) > 4 && first.Valid {
+			phonePlus := "+" + phoneSlice[len(phoneSlice) - 4]
+			fL := firstLast{first.String, last.String}
+
+			m[phonePlus] = fL
+		}
+	}
+
+	return m, nil
 }
